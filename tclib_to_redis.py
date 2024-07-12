@@ -167,7 +167,7 @@ class TCWorker():
                 color, type, id, name = self._parse_itemlink(msg[start:end])
             except IndexError:
                 break
-            link = '<a target="_blank" style="color:#%s" href="http://www.wowhead.com/%s=%d">[%s]</a>' % (color, type, id, name) 
+            link = '<a target="_blank" style="color:#%s" href="http://www.wowhead.com/classic/%s=%d">[%s]</a>' % (color, type, id, name) 
             msg = msg[:start] + link + msg[end:]
         
         msg = msg.replace("|r", "")
