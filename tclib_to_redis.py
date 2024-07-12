@@ -1,20 +1,12 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""
----------------------------------------------------------------------------------
-"THE BEER-WARE LICENSE" (Revision 42):
-<adam.bambuch2@gmail.com> wrote this file. As long as you retain this notice you
-can do whatever you want with this stuff. If we meet some day, and you think
-this stuff is worth it, you can buy me a beer in return Adam Bambuch
----------------------------------------------------------------------------------
-"""
-
 import sys
 import logging
 import threading
 import time
 import re
+import cgi
 
 import redis
 import tclib
@@ -28,11 +20,14 @@ class Redis():
         self._redis = redis.StrictRedis(host=config.redis_host, port=config.redis_port, db=config.redis_db)
         self._lock = threading.RLock()
 
+        self._create_max_id()
+
     def _create_max_id(self):
         if self._get_max_id() is None:
             self._redis.set("max_id", 0)
         
     def save_message(self, msg):
+        print msg
         with self._lock:
             max_id = self._get_max_id()
             self._redis.set(max_id + 1, msg, ex=config.redis_ttl)
@@ -42,7 +37,10 @@ class Redis():
         return self._redis.get(key)
     
     def _get_max_id(self):
-        return self._get("max_id")
+        max_id = self._get("max_id")
+        if max_id:
+            max_id = int(max_id)
+        return max_id
     
 
 class TCWorker():
@@ -110,7 +108,8 @@ class TCWorker():
                         self._username,
                         r.get_S_hash(),
                         self._wow_ver,
-                        realm_i["id"])
+                        realm_i["id"],
+                        True)
         w.start()
         try:
             players = w.wait_get_my_players()
@@ -146,20 +145,43 @@ class TCWorker():
         self._connected = True
         
         return True
-    
-    def _remove_item_link(self, msg):
-        msg = re.sub(r'\|(?:.*?)\|Hitem:(?:.*?)\|.\[([^\]]+)(?:\]\|.\|.)?',
-                r'[\1]',
-                msg)
+
+    def _parse_itemlink(self, itemlink):
+        items = itemlink.split("|")[1:]
+        color = cgi.escape(items[0][3:])
+        type = cgi.escape(items[1][1:items[1].find(":")])
+        id = int(items[1][2 + len(type):items[1].find(":", 3 + len(type))])
+        name = cgi.escape(items[2][2:-1])
+
+        return color, type, id, name
+
+    def _wowhead_links(self, msg):
         msg = msg.replace("||", "\0\0")
-        msg = msg.replace("|", "")
-        msg = msg.replace("\0\0", "||")
+        for i in range(20):
+            start = msg.find("|")
+            end = msg.find("|h|r", start + 1) + len("|h|r")
+            if start == -1 or end == -1:
+                break
+            
+            try:
+                color, type, id, name = self._parse_itemlink(msg[start:end])
+            except IndexError:
+                break
+            link = '<a target="_blank" style="color:#%s" href="http://www.wowhead.com/%s=%d">[%s]</a>' % (color, type, id, name) 
+            msg = msg[:start] + link + msg[end:]
+        
+        msg = msg.replace("|r", "")
+        msg = re.sub("\|c[0-9a-fA-F]{8}", "", msg)
+            
+        msg = msg.replace("\0\0", "|")
+        
         return msg
            
     def _log_status(self):
         logging.warning("TC: %s", self._status)
         
     def _handle_message_chat(self, opcode, msg_type, data):
+        print data
         if opcode not in (tclib.const.SMSG_MESSAGECHAT,
                           tclib.const.SMSG_GM_MESSAGECHAT):
             return
@@ -176,7 +198,11 @@ class TCWorker():
         user = user.decode("utf-8")
         msg = msg.decode("utf-8")
 
-        msg = self._remove_item_link(msg)
+        # msg replace all html tags
+
+        msg = cgi.escape(msg)
+        msg = self._wowhead_links(msg)
+        print msg
 
         self._redis.save_message("%s: %s" % (user, msg))
 
@@ -184,5 +210,4 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.WARNING)
     
     TCWorker().run()
-    
     

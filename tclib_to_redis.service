@@ -1,0 +1,18 @@
+# systemd service for tclib_to_redis.py
+
+[Unit]
+Description=tclib_to_redis
+After=network.target
+
+[Service]
+Type=simple
+LimitNOFILE=1048576
+Restart=always
+RestartSec=5
+User=tclib
+WorkingDirectory=/opt/tc-channel-web
+ExecStart=python2 tclib_to_redis.py
+TimeoutStopSec=2
+
+[Install]
+WantedBy=multi-user.target
