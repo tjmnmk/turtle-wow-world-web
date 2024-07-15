@@ -5,6 +5,7 @@ import discord
 import redis
 import config
 from discord.ext import tasks, commands
+import re
 
 
 class Redis():
@@ -59,6 +60,8 @@ class Discord(discord.Client):
                     message = message.decode('utf-8')
                 except:
                     continue
+                # remove a tags
+                message = re.sub(r'<a.*?>|</a>', '', message)
                 await channel.send(message)
 
 intents = discord.Intents.default()
