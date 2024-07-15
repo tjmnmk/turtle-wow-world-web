@@ -204,7 +204,7 @@ class TCWorker():
         msg = self._wowhead_links(msg)
         print msg
 
-        self._redis.save_message("%s: %s" % (user, msg))
+        self._redis.save_message("<b>%s:</b> %s" % (user, msg))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.WARNING)
