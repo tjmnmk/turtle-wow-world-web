@@ -6,6 +6,7 @@ import redis
 import config
 from discord.ext import tasks, commands
 import re
+from markdownify import markdownify as md
 
 
 class Redis():
@@ -60,8 +61,11 @@ class Discord(discord.Client):
                     message = message.decode('utf-8')
                 except:
                     continue
-                # remove a tags
-                message = re.sub(r'<a.*?>|</a>', '', message)
+                # convert html to markdown
+                try:
+                    message = md(message)
+                except:
+                    pass
                 await channel.send(message)
 
 intents = discord.Intents.default()
